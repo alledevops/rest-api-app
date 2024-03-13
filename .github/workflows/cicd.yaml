@@ -1,0 +1,48 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # CI Steps (e.g., testing, linting, building Docker image)
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Run tests
+      run: pytest
+
+    - name: Build Docker image
+      run: docker build -t rest-api-app .
+
+    # CD Steps (e.g., deploying Docker image to ECS)
+
+    - name: Tag Docker image and push to ECR
+      run: |
+        docker tag rest-api-app:latest 920017674756.dkr.ecr.us-east-1.amazonaws.com/rest-api-app:latest
+        docker login -u AWS -p "$(aws ecr get-login-password --region $AWS_REGION)" 920017674756.dkr.ecr.us-east-1.amazonaws.com
+        docker push 920017674756.dkr.ecr.us-east-1.amazonaws.com/rest-api-app:latest
+
+    - name: Deploy to ECS
+      run: |
+        aws ecs update-service --cluster <cluster-name> --service <service-name> --force-new-deployment
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: us-east-1
